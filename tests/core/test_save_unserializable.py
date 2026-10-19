@@ -24,45 +24,47 @@ class TestSaveUnserializableCorpus(unittest.TestCase):
             {"id": 2, "text": self.texts[2]},
         ]
 
-    def assert_save_raises_type_error(self, mmap=False):
+    def assert_save_raises_type_error(self, entry, cause_type):
+        corpus = [self.corpus[0], entry, self.corpus[2]]
         try:
-            json_functions.dumps(self.corpus[1], ensure_ascii=False)
+            json_functions.dumps(entry, ensure_ascii=False)
         except Exception as e:
             encoder_error = e
         else:
             self.fail("corpus entry 1 should not be JSON serializable")
 
         try:
-            self.model.save(self.directory, corpus=self.corpus, show_progress=False)
+            self.model.save(self.directory, corpus=corpus, show_progress=False)
         except TypeError as e:
             self.assertIn("Document at index 1", str(e))
             self.assertIn(str(encoder_error), str(e))
             self.assertIsNotNone(e.__cause__)
-            self.assertIsInstance(e.__cause__, TypeError)
+            self.assertIsInstance(e.__cause__, cause_type)
             self.assertIs(type(e.__cause__), type(encoder_error))
+            self.assertEqual(str(e.__cause__), str(encoder_error))
             return
 
-        loaded = bm25s.BM25.load(
-            self.directory, load_corpus=True, mmap=mmap, show_progress=False
-        )
-        if mmap:
-            self.addCleanup(loaded.corpus.close)
+        loaded = bm25s.BM25.load(self.directory, load_corpus=True, show_progress=False)
         results, _ = loaded.retrieve([["dog"]], k=1, show_progress=False)
         self.fail(
             f"save() did not raise TypeError, and searching 'dog' after reload "
-            f"(mmap={mmap}) returned {results[0, 0]!r}"
+            f"returned {results[0, 0]!r}"
         )
 
     def test_unserializable_entry(self):
-        self.assert_save_raises_type_error()
-
-    def test_unserializable_entry_mmap(self):
-        self.assert_save_raises_type_error(mmap=True)
+        self.assert_save_raises_type_error(self.corpus[1], TypeError)
 
     @unittest.mock.patch("bm25s.utils.json_functions.dumps", json_functions.dumps_with_builtin)
     @unittest.mock.patch("bm25s.utils.json_functions.loads", json.loads)
     def test_unserializable_entry_no_orjson(self):
-        self.assert_save_raises_type_error()
+        self.assert_save_raises_type_error(self.corpus[1], TypeError)
+
+    @unittest.mock.patch("bm25s.utils.json_functions.dumps", json_functions.dumps_with_builtin)
+    @unittest.mock.patch("bm25s.utils.json_functions.loads", json.loads)
+    def test_circular_reference_no_orjson(self):
+        entry = {"id": 1, "text": self.texts[1]}
+        entry["self"] = entry
+        self.assert_save_raises_type_error(entry, ValueError)
 
 
 if __name__ == "__main__":

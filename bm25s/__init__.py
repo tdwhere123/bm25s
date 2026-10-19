@@ -957,6 +957,10 @@ class BM25:
         Save the BM25S index to the `save_dir` directory. This will save the scores array,
         the indices array, the indptr array, the vocab dictionary, and the parameters.
 
+        If saving fails partway (for example, because a corpus entry cannot be serialized
+        to JSON), some files may already have been written to `save_dir`. Do not use that
+        directory until a later call to `save` succeeds.
+
         Parameters
         ----------
         save_dir : str
