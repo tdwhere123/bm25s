@@ -1063,9 +1063,12 @@ class BM25:
                     try:
                         doc_str = json_functions.dumps(doc, ensure_ascii=False)
                     except Exception as e:
-                        logging.warning(f"Error saving document at index {i}: {e}")
-                    else:
-                        f.write(doc_str + "\n")
+                        raise TypeError(
+                            f"Document at index {i} could not be serialized to JSON "
+                            f"({type(e).__name__}: {e}). "
+                            "Skipping it would misalign the saved corpus with the index."
+                        ) from e
+                    f.write(doc_str + "\n")
 
             # also save corpus.mmindex
             mmidx = utils.corpus.find_newline_positions(save_dir / corpus_name, show_progress=show_progress, leave_progress=leave_progress)
